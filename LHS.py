@@ -61,5 +61,5 @@ df = df[df["graphite_wt%"] > 0].reset_index(drop=True)
 df.index = np.arange(1, len(df) + 1)
 
 # 출력
-st.subheader("📋 샘플링된 조성표")
+st.subheader("조성표")
 st.dataframe(df.style.format(precision=2))
