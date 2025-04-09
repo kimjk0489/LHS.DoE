@@ -6,7 +6,7 @@ from pyDOE import lhs
 st.set_page_config(page_title="LHS 슬러리 조성표", layout="wide")
 st.title("LHS 기반 음극 슬러리 조성표 생성기")
 
-st.markdown("**LHS를 이용해 Carbon Black, CMC, Solvent 조성을 샘플링하고, Graphite는 자동 계산됩니다.**")
+st.markdown("**LHS를 이용해 Carbon Black, CMC, SBR, Solvent 조성을 샘플링하고, Graphite는 자동 계산됩니다.**")
 
 # 샘플 수 입력
 n_samples = st.number_input("샘플 수 입력", min_value=1, max_value=100, value=10, step=1)
@@ -25,22 +25,29 @@ col3, col4 = st.sidebar.columns(2)
 cmc_min = col3.number_input("CMC 최소", key="cmc_min", value=2.0, step=0.1, label_visibility="collapsed")
 cmc_max = col4.number_input("CMC 최대", key="cmc_max", value=10.0, step=0.1, label_visibility="collapsed")
 
+# SBR
+st.sidebar.markdown("**SBR (wt%)**")
+col5, col6 = st.sidebar.columns(2)
+sbr_min = col5.number_input("SBR 최소", key="sbr_min", value=0.5, step=0.1, label_visibility="collapsed")
+sbr_max = col6.number_input("SBR 최대", key="sbr_max", value=5.0, step=0.1, label_visibility="collapsed")
+
 # Solvent
 st.sidebar.markdown("**Solvent (wt%)**")
-col5, col6 = st.sidebar.columns(2)
-solvent_min = col5.number_input("Solvent 최소", key="solvent_min", value=30.0, step=0.1, label_visibility="collapsed")
-solvent_max = col6.number_input("Solvent 최대", key="solvent_max", value=60.0, step=0.1, label_visibility="collapsed")
+col7, col8 = st.sidebar.columns(2)
+solvent_min = col7.number_input("Solvent 최소", key="solvent_min", value=30.0, step=0.1, label_visibility="collapsed")
+solvent_max = col8.number_input("Solvent 최대", key="solvent_max", value=60.0, step=0.1, label_visibility="collapsed")
 
 # Graphite
 st.sidebar.markdown("**Graphite (wt%)**")
-col7, col8 = st.sidebar.columns(2)
-graphite_min = col7.number_input("Graphite 최소", key="graphite_min", value=30.0, step=0.5, label_visibility="collapsed")
-graphite_max = col8.number_input("Graphite 최대", key="graphite_max", value=65.0, step=0.5, label_visibility="collapsed")
+col9, col10 = st.sidebar.columns(2)
+graphite_min = col9.number_input("Graphite 최소", key="graphite_min", value=30.0, step=0.5, label_visibility="collapsed")
+graphite_max = col10.number_input("Graphite 최대", key="graphite_max", value=65.0, step=0.5, label_visibility="collapsed")
 
 # 범위 정리
 bounds = {
     'carbon_black': (cb_min, cb_max),
     'cmc': (cmc_min, cmc_max),
+    'sbr': (sbr_min, sbr_max),
     'solvent': (solvent_min, solvent_max)
 }
 keys = list(bounds.keys())
@@ -60,16 +67,29 @@ while len(valid_samples) < n_samples and trial_count < max_trials:
         val = lhs_sample[0, i] * (max_val - min_val) + min_val
         sample_dict[key + "_wt%"] = val
 
-    # Graphite 계산
-    graphite = 100 - sample_dict["carbon_black_wt%"] - sample_dict["cmc_wt%"] - sample_dict["solvent_wt%"]
+    # 조건: cmc < sbr
+    if sample_dict["cmc_wt%"] >= sample_dict["sbr_wt%"]:
+        continue
 
-    # 조건 만족하면 추가
+    # Graphite 계산
+    graphite = (
+        100
+        - sample_dict["carbon_black_wt%"]
+        - sample_dict["cmc_wt%"]
+        - sample_dict["sbr_wt%"]
+        - sample_dict["solvent_wt%"]
+    )
+
     if 0 < graphite <= 100 and graphite_min <= graphite <= graphite_max:
         sample_dict["graphite_wt%"] = graphite
+        cmc = sample_dict['cmc_wt%']
+        sbr = sample_dict['sbr_wt%']
+        cmc_to_sbr = sbr / cmc if cmc != 0 else 0
+        sample_dict["cmc:sbr"] = f"1:{cmc_to_sbr:.2f}"
         valid_samples.append(sample_dict)
 
 # 결과 출력
-st.subheader("조성표")
+st.subheader("조성표 (wt%)")
 
 if len(valid_samples) < n_samples:
     st.warning(f"조건을 만족하는 조성을 {n_samples}개 중 {len(valid_samples)}개만 생성했습니다. 범위를 완화해보세요.")
